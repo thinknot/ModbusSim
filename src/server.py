@@ -7,9 +7,10 @@
 import argparse
 import logging
 import os
+import sys
 import signal
 import struct
-
+from logging import log
 from threading import Thread
 
 from configparser import ConfigParser
@@ -51,8 +52,7 @@ def init_sim():
     global sim
 
     # in debug mode, this will get called twice. run only after reload
-    if config.getboolean('server', 'debug') \
-            and not os.environ.get('WERKZEUG_RUN_MAIN'):
+    if config.getboolean('server', 'debug') and not os.environ.get('WERKZEUG_RUN_MAIN'):
         LOGGER.info("Running in debug mode, will initialize after reload")
         return
 
@@ -65,14 +65,14 @@ def init_sim():
         holding_register_count = config.getint('slave-config',
                                                'holding_register_count')
 
-        if config.mode == 'rtu':
-            sim = ModbusSim(mode=config.mode,
-                            port=config.serial,
-                            baud=config.rtu_baud)
+        if config.get('modbus', 'mode') == 'rtu':
+            sim = ModbusSim(mode=config.get('modbus', 'mode'),
+                            port=config.get('modbus', 'serial'),
+                            baud=config.getint('modbus', 'rtu_baud'))
         else:
-            sim = ModbusSim(mode=config.mode,
-                            port=config.port,
-                            hostname=config.hostname)
+            sim = ModbusSim(mode=config.get('modbus', 'mode'),
+                            port=config.getint('modbus', 'port'),
+                            hostname=config.get('modbus', 'hostname'))
 
         for slave_id_offset in range(0, slave_count):
             sim.add_slave(slave_start_id + slave_id_offset,
@@ -611,8 +611,8 @@ def parse_args():
     parser.add_argument('-p', '--rtu_parity', type=str, choices=('even','odd','none'), default='none', help='modbus over serial parity')
     parser.add_argument('-b', '--rtu_baud', type=int, default=9600, help='baud rate for modbus')
     parser.add_argument('-t', '--hostname', type=str, default='127.0.0.1', help='IP hostname or address')
-    parser.add_argument('-c', '--config', type=str, default='../config/test.conf', help='modbus simulator configuration file')
-    parser.add_argument('-s', '--serial', type=str, default='/dev/ttyS0', help='serial port on which to sim')
+    parser.add_argument('-c', '--config', type=str, default='/home/ccc/src/modbussim/config/test.conf', help='modbus simulator configuration file')
+    parser.add_argument('-s', '--serial', type=str, default='/dev/ttyS3', help='serial port on which to sim')
     parser.add_argument('-n', '--slave_count', type=int, default=0, help='Number of slave devices to create')
     parser.add_argument('-d', '--slave_start_id', type=int, default=1, help='Starting id of slaves')
 
@@ -626,17 +626,17 @@ def load_config(args):
     if args.slave_id:
         config.slave_id = args.slave_id
     if args.mode:
-        config.mode = args.mode
+        config.set('modbus', 'mode', args.mode)
     if args.port:
-        config.port = args.port
+        config.set('modbus', 'port', str(args.port))
     if args.rtu_parity:
-        config.rtu_parity = args.rtu_parity
+        config.set('modbus', 'rtu_parity', args.rtu_parity)
     if args.rtu_baud:
-        config.rtu_baud = args.rtu_baud
+        config.set('modbus', 'rtu_baud', str(args.rtu_baud))
     if args.hostname:
-        config.hostname = args.hostname
+        config.set('modbus', 'hostname', args.hostname)
     if args.serial:
-        config.serial = args.serial
+        config.set('modbus', 'serial', args.serial)
 
     if not 'slaves' in config.sections():
         config.add_section('slaves')
